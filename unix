@@ -1,0 +1,737 @@
+#include<stdio.h>
+#include "apue.h"
+
+//在文件开头先进行下面定义函数的声明；
+void pr_stdio(const char *, FILE *);
+int is_unbuffered(FILE *);
+int is_linebuffered(FILE *);
+int buffer_size(FILE *);
+
+int main(void){
+    FILE *fp; //创建一个指向文件的指针；属于FILE文件类型；
+
+    fputs("enter any character\n",stdout); //将“enter...”写入指定的标准输出流stdout中；
+    if(getchar()==EOF) //读取流中的一个字符；
+        err_sys("getchar error");
+    fputs("one line to standard error\n",stderr);//将字符写入标准错误流中；
+
+    pr_stdio("stdin",stdin);
+    pr_stdio("stdout",stdout);
+    pr_stdio("stderr",stderr);
+
+    if
+}
+//对每个流的一个操作，说明；fp代表了指向流的指针；
+void pr_stdio(const char *name, FILE *fp){
+    printf("strean= %s,",name); //将流的信息输入到标准输出流；
+    if(is_unbuffered(fp))
+        printf("unbuffered");
+    else if(is_linebuffered(fp))
+        printf("line buffered");
+    else
+        printf("fully buffered");
+    printf(",buffer size= %d\n",buffer_size(fp));
+}
+
+
+//#if #endif 是C++的条件编译预处理命令；
+//下面可能会有不同的实现方式，根据#if 判断是否定义相关，如定义了则会编译对应区域的代码块；
+
+#if defined(_IO_UNBUFFERED)
+
+int is_unbuffered(FILE *fp){
+    return (fp->_flags & _IO_UNBUFFERED);
+}
+int is_linebuffered(FILE *fp){
+    return (fp->_flags & _IO_LINE_BUF);
+}
+int buffer_size(FILE *fp){
+    return (fp->_IO_buf_end - fp->_IO_buf_base);
+}
+
+#elif defined(__SNBF)
+
+int is_unbuffered(FILE *fp){
+    return (fp->_flags & __SNBF);
+}
+int is_linebuffered(FILE *fp){
+    return (fp->_flags & __SLBF);
+}
+int buffer_size(FILE *fp){
+    return (fp->buf.size);
+}
+
+#elif defined(_IONBF)
+
+#ifdef _LP64
+#define _flag __pad[4]
+#define _ptr __pad[1]
+#define _base __pad[2]
+#endif
+
+int is_unbuffered(FILE *fp){
+    return (fp->flag & _IONBF);
+}
+int is_linebuffered(FILE *fp){
+    return (fp->_flag & _IONBF);
+}
+int buffer_size(FILE *fp){
+    #ifdef _LP64
+        return (fp->_base-fp->_ptr);
+    #else
+        return (BUFSIZ);
+    #endif
+}
+#else
+#errror unkonwn stdio implementation!
+#endif
+
+
+
+#include "apue.h"
+
+int main(void){
+    char name[L_tmpnam],line[MAXLINE];
+    FILE *fp;
+
+    printf("%s\n",tmpnam(NULL));//首先使用tmpnam函数创建一个与现有文件名不同的有效路径名字字符串；
+
+    tmpnam(name); //这里的name是指向数组的指针；
+    printf("%s\n",name);
+
+    if((fp==tmpfile())==NULL) //创建一个临时文件
+        err_sys("tmpfile error");
+    fputs("one line of output\n",fp);
+    rewind(fp); //重定位到文件的开头位置；
+    if(fgets(line,sizeof(line),fp)==NULL) //将name数组中的内容复制到line数组中；
+        err_sys("fgets error");
+    fputs(line,stdout); //将line中的内容输入到标准输出流中；
+    exit(0);
+}
+
+#include "apue.h"
+#include <errno.h>
+
+void make_temp(char *template);
+
+int main(){
+    char good_template[]='/tmp/dirXXXXXX';
+    char *bad_template="/tmp/dirXXXXXX";
+    printf("trying to create first temp file...\n");
+    make_temp(good_template);
+    printf("trying to create second temp file...\n");
+    make_temp(bad_template);
+    exit(0);
+}
+
+void make_temp(char *template){
+    int fd;
+    struct  stst sbuf;
+
+    if((fd=mkstemp(template))<0)
+        err_sys("can't create temp file");
+    printf("temp name=%s\n",template);
+    close(fd);
+    if(stat(template, &sbuf)<0){
+        if(errno==ENOENT)
+            printf("file doesn't exist\n");
+        else
+            err_sys("stat failed");
+    }else{
+        printf("file exits\n");
+        unlink(template);
+    }
+}
+
+
+//5-15
+#include "apue.h"
+#define BSZ 48
+
+int main(){
+    FILE *fp;
+    char buf[BSZ];
+
+    memset(buf,'a',BSZ-2); //用字符a来初始化buf所指向的缓冲区；
+    buf[BSZ-2]='\0';
+    buf[BSZ-1]='x';
+    if((fp=fmemopen(buf,BSZ,"w+")==NULL))
+        err_sys("fmemopen failed!");
+    printf("initial buffer contents: %s\n",buf);
+    fprintf(fp,"hello world"); //将字符串写入到指定的流fp中；
+    printf("before flush :%s\n",buf);
+    fflush(fp); //冲刷流；
+    printf("after fflush :%s\n",buf); //打印查看冲刷之后流中的内容是什么；
+    printf("len of string in buf=%ld\n",(long)strlen(buf));
+
+    memset(buf,'b',BSZ-2);
+    buf[BSZ-2]='\0';
+    buf[BSZ-1]='x';
+    fprintf(fp,"hello world");
+    fseek(fp,0,SEEK_SET);
+    printf("after fseek: %s\n",buf);
+    printf("len of string in buf=%ld\n",(long)strlen(buf));
+
+    memset(buf,'c',BSZ-2);
+    buf[BSZ-2]='\0';
+    buf[BSZ-1]='x';
+    fprintf(fp);
+    fseek(fp,0,SEEK_SET);
+    printf("after fseek: %s\n",buf);
+    printf("len of string in buf=%ld\n",(long)strlen(buf));
+
+    return 0;
+}
+
+
+
+//程序6-2
+#include<pwd.h>
+#include<stddef.h>
+#include<string.h>
+
+//这个函数返回一个指向口令文件结构体的指针；
+struct passwd * getpwnam(const char *name){
+    struct passwd *ptr;
+
+    setpwent();
+    //这里再函数开始的时候调用setpwent函数是自我保护的措施，以便确保调用者在使用之前已经调用getpwent打开了
+    //有关文件情况下，反绕有关文件使得他们定位到文件开始处。
+    while((ptr=getpwent())!=NULL)
+        if(strcmp(name,ptr->pw_name)==0)
+            break;
+    endpwent();
+    return(ptr);
+}
+//注意：getpwnam和getpwuid完成后不应该使有关文件处于打开状态，所以应该使用endpwent关闭他们。
+
+
+
+
+#include "apue.h"
+static void my_exit1(void);
+static void my_exit2(void);
+
+int main(void){
+    if(atexit(my_exit2)!=0)err_sys("can't register my_exit2");
+    if(atexit(my_exit1)!=0)err_sys("can't register my_exit1");
+    if(atexit(my_exit1)!=0)err_sys("can't register my_exit1");
+    printf("main is done\n");
+    return(0);
+}
+
+static void my_exit1(void){
+    printf("first exit handler\n");
+}
+static void my_exit2(void){
+    printf("second exit handler\n");
+}
+
+
+//7-4
+
+#include"apue.h"
+int main(int argc,char *argv[]){
+    int i;
+    for(i=0;i<argc;i++){
+        printf("arve[%d]:%s\n",i,argv[i]);
+    }
+    exit(0);
+}
+
+
+//7-9
+
+//下面程序：
+//主循环从标准输入读一行，然后调用do_line处理该输入行。do_line函数调用get_token从该输入行中
+//取下一个标记，一行中的第一个标记假定是一条某种形式的命令，switch语句实现命令的选择。
+#include"apue.h"
+#define TOK_ADD 5 //将5使用TOK_ADD表示；
+
+//首先对将要使用到的函数进行函数声明；
+void do_line(char *);  //用于处理每一个输入行；
+void cmd_add(void);  //
+int get_token(void); //获取每一个输入行的标记；
+
+int main(void){
+    char line[MAXLINE]; //用于存入每次读入的命令，按照字符串的形式存入该字符数组中；
+    //fgets函数从标准输入流中读取MAXLINE歌字符存储到字符指针标量line所指向的内存空间；
+    //它返回值是一个指针，指向字符串中第一个字符的地址。读取输入的每一行；
+    while(fgets(line,MAXLINE,stdin)!=NULL) 
+        do_line(line); //对输入流中获取的命令进行处理；
+    exit(0);
+}
+char *top_ptr;
+
+//对每一行进行处理；参数为获取的每一行命令所存储的字符数组的首地址指针；
+void do_line(char *ptr){
+    int cmd;
+
+    tok_ptr=ptr;
+    //获取每一个标记进行检查与处理；
+    while((cmd=get_token())>0){
+        switch(cmd){
+            case TOK_ADD:
+                cmd_add();
+                break;
+        }
+    }
+}
+void cmd_add(void){
+    int token;
+    token=get_token();
+}
+
+int get_token(void){
+
+}
+
+//====================================
+
+#include"apue.h"
+#include<setjmp.h>
+
+#define TOK_ADD 5
+
+jmp_buf jmpbuffer;
+
+int main(void){
+    char line[MAXLINE];
+    if(setjmp(jmpbuffer)!=0)printf("error");
+    while(fgets(line,MAXLINE,stdin)!=NULL)do_line(line);
+    exit(0);
+}
+
+char *top_ptr;
+
+void do_line(char *ptr){
+    int cmd;
+
+    tok_ptr=ptr;
+    while((cmd=get_token())>0){
+        switch(cmd){
+            case TOK_ADD:
+                cmd_add();
+                break;
+        }
+    }
+}
+void cmd_add(void){
+    int token;
+    token=get_token();
+    if(token<0){
+        longjmp(jmpbuffer,1);
+    }
+}
+
+int get_token(void){
+
+}
+
+
+//=================================================
+#include"apue.h"
+#include<setjmp.h>
+
+//首先声明两个静态函数；
+static void f1(int,int,int,int);
+static void f2(void);
+
+//声明静态变量；
+static jmp_buf jmpbuffer;
+static int globval; //全局变量；
+
+int main(void){
+    int autoval; //自动变量；
+    register int regival; //寄存器变量；
+    volatile int volaval; //易变变量；
+    static int statval; //静态变量；
+
+    globval=1; //全局变量；
+    autoval=2;
+    regival=3;
+    volaval=4;
+    statval=5;
+
+    if(setjmp(jmpbuffer)!=0){
+        printf("after longjmp:\n");
+        printf("globval=%d,autoval=%d,regival=%d,volaval=%d,statval=%d\n",globval,autoval,regival,volaval,statval);
+        exit(0);
+    }
+    globval=95;autoval=96;regival=97;volaval=98;
+    statval=99;
+
+    f1(autoval,regival,volaval,statval);
+    exit(0);
+}
+
+static void f1(int i,int j,int k,int l){
+    printf("in f1():\n");
+    printf("globval=%d,autoval=%d,regival=%d,volaval=%d,statval=%d\n",globval,i,j,k,l);
+    f2();
+}
+
+static void f2(void){
+    longjmp(jmpbuffer,1);//调用longjmp；
+}
+
+
+//7-14
+#include<stdlib.h>
+
+FILE * open_data(void){
+    FILE *fp;
+    char databuf[BUFSIZ];
+
+    if((fp=fopen()))
+}
+
+
+//7-16
+#include"apue.h"
+#include<sys/resource.h>
+
+#define doit(name) pr_limits(#name,name)
+static void pr_limits(const char*,int);
+
+int main(void){
+#ifdef RLIMIT_AS
+    doit(RLIMIT_AS);
+#endif
+    doit(RLIMIT_CORE);
+    doit(RLIMIT_CPU);
+    doit(RLIMIT_DATA);
+    doit(RLIMIT_FSIZE);
+#ifdef RLIMIT_MEMLOCK
+    doit(RLIMIT_MEMLOCK);
+#endif
+
+#ifdef RLIMIT_MSGQUEUE
+    doit(RLIMIT_MSGQUEUE);
+#endif
+
+#ifdef RLIMIT_NICE
+    doit(RLIMIT_NICE);
+#endif
+
+    doit(RLIMIT_NOFILE);
+
+#ifdef RLIMIT_NPROC
+    doit(RLIMIT_NPROC);
+#endif
+
+#ifdef RLIMIT_NPTS
+    doit(RLIMIT_NPTS);
+#endif
+
+#ifdef RLIMIT_RSS
+    doit(RLIMIT_RSS);
+#endif
+
+#ifdef RLIMIT_SBSIZE
+    doit(RLIMIT_SBSIZE);
+#endif
+
+#ifdef RLIMIT_SIGPENDING
+    doit(RLIMIT_SIGPENDING);
+#endif
+
+    doit(RLIMIT_STACK);
+
+#ifdef RLIMIT_SWAP
+    doit(RLIMIT_SWAP);
+#endif
+
+#ifdef RLIMIT_VMEM
+    doit(RLIMIT_VMEM);
+#endif
+
+    exit(0);
+}
+
+static void pr_limits(const char *name,int resource){
+    struct rlimit limit;
+    unsigned long long lim;
+
+    if(getrlimit(resource,&limit)<0) err_sys("getrlimit error for %s",name);
+    printf("%-14s ",name);
+    if(limit.rlim_cur==RLIM_INFINITY){
+        printf("(infinite) ");
+    }else{
+        lim=limit.rlim_cur;
+        printf("%10lld ",lim);
+    }
+    if(limit.rlim_max==RLIM_INFINITY){
+        printf("(infinite)");
+    }else{
+        lim=limit.rlim_max;
+        printf("%10lld",lim);
+    }
+    putchar((int)'\n');
+}
+
+
+
+#include"apue.h"
+
+//全局变量
+int globval=6;
+char buf[]="a write to stdout\n";
+
+int main(){
+    int var;
+    pid_t pid;
+
+    var=88;
+    //write(STDOUT_FILENO,buf,sizeof(buf)-1)把缓冲区buf中的内容都拷贝到输出流中；
+    if(write(STDOUT_FILENO,buf,sizeof(buf)-1)!=sizeof(buf)-1)
+        err_sys("write error!");
+    printf("before fork\n");
+
+    if((pid=fork())<0){
+        err_sys("fork error");
+    }else if(pid==0){  //pid=0表示是子进程；
+        globval++;
+        var++;
+    }else{ //非0正数是父进程；
+        sleep(2);
+    }
+
+    printf("pid=%ld,glob=%d,var=%d\n",(long)getpid(),globval,var);
+    exit(0);
+}
+
+
+//8-3程序，将fork函数替换成了vfork函数：
+//删除了对标准输出write的调用，不再需要让父进程调用sleep，因为可以保证，
+//在子进程调用exec或exit之前，内核会使得父进程进入休眠状态；
+#include"apue.h"
+int globval=6;
+int main(void){
+    int var;
+    pid_t pid;
+
+    var=88;
+    printf("before vfork\n");
+    if((pid=vfork())<0){
+        err_sys("vfork error");
+    }else if(pid==0){
+        globval++;
+        var++;
+        _exit(0);
+    }
+    printf("pid=%ld,glob=%d,var=%d\n",(long)getpid(),globval,var);
+    exit(0);
+}
+
+
+//8-5 使用宏打印进程终止状态的说明；
+#include"apue.h"
+#include<sys/wait.h>
+
+void pr_exit(int status)
+{
+    if(WIFEXITED(status)) //如为正常终止子进程返回状态则为真。
+        printf("normal termination, exit status =%d\n",WEXITSTATUS(status));
+    else if(WIFSIGNALED(status)) //若为异常终止子进程返回的状态则为真。
+        printf("abnormal termination, signal number =%d%s\n",WTERMSIG(status),
+#ifdef WCOREDUMP 
+        WCOREDUMP(status)?"(core file generated)":"");
+#else
+        "");
+#endif
+    else if(WIFSTOPPED(status)) //如为当前子进程的返回状态则为真。
+        printf("child stopped, signal number=%d\n",WSTOPSIG(status));
+}
+
+int main(void)
+{
+    pid_t pid;
+    int status;
+    //使用exit正常退出状态：
+    if((pid=fork())<0) err_sys("fork error"); //创建子进程失败；
+    else if(pid==0)exit(7); //该子进程退出是状态为7；如果是创建的；
+
+    if(wait(&status)!=pid)err_sys("wait error");  //这里将终止进程的终止状态存放在status所指向的存储单元；
+    pr_exit(status);//对状态进行检查类型；
+
+    //使用abort函数终止状态：立即终止当前进程，产生异常程序终止，进程终止时不会销毁任何对象；
+    if((pid=fork())<0)err_sys("fork error");
+    else if(pid==0)abort(); 
+
+    if(wait(&status)!=pid)err_sys("wait error");
+    pr_exit(status);
+
+    //异常终止；除0出错：
+    if((pid=fork())<0)err_sys("fork error");
+    else if (pid==0) status/=0;
+
+    if (wait(&status)!=pid)err_sys("wait error");
+    pr_exit(status);
+
+    exit(0);
+}
+
+
+
+//8-8
+#include"apue.h"
+#include<sys/wait.h>
+
+int main(void){
+    pid_t pid; //用于获取进程号；
+
+    if((pid=fork())<0)err_sys("fork error");
+    else if(pid==0){ //在第一个子进程内；
+        if((pid=fork())<0)err_sys("fork error");
+        else if(pid>0)exit(0); //大于0表示是该第一层的子进程，退出；这样就第二层的子进程没有了父进程；
+        sleep(2);
+        printf("second child parent pid=%ld\n",(long)getppid()); //所以这里的没有父进程的子进程被init进程收养；
+        exit(0);
+    }
+    if(waitpid(pid,NULL,0)!=pid)err_sys("waitpid error");
+    exit(0);
+}
+
+#include"apue.h"
+TELL_WAIT();
+if((pid=fork())<0){
+    err_sys("fork error");
+}else if(pid==0){
+    TELL_PARENT(getppid()); //告诉父进程已经创建好了子进程；
+    WAIT_PARENT(); //等待父进程；
+    exit(0);
+}
+TELL_CHILD(pid);
+WAIT_CHILD();
+exit(0);
+
+//8-12
+#include "apue.h"
+static void charatatime(char *);
+
+int main(void){
+    pid_t pid;
+    if((pid=fork())<0){
+        err_sys("fork error");
+    }else if(pid==0){
+        charatatime("output from child\n");
+    }else{
+        charatatime("output from parent\n");
+    }
+    exit(0);
+}
+static void charatatime(char *str){
+    char *ptr;
+    int c;
+    setbuf(stdout,NULL);
+    for(ptr=str;(c=*ptr++)!=0;){
+        putc(c,stdout);
+    }
+}
+
+//8-13
+#include "apue.h"
+static void charatatime(char *);
+
+int main(void){
+    pid_t pid;
+    TELL_WAIT();
+
+    if((pid=fork())<0){
+        err_sys("fork error");
+    }else if(pid==0){
+        WAIT_PARENT(); //等待父进程；
+        charatatime("output from child\n");
+    }else{
+        charatatime("output from parent\n");
+        WAIT_CHILD(pid); //告诉子进程自己已经结束了；
+    }
+    exit(0);
+}
+static void charatatime(char *str){
+    char *ptr;
+    int c;
+    setbuf(stdout,NULL);
+    for(ptr=str;(c=*ptr++)!=0;){
+        putc(c,stdout);
+    }
+}
+
+//8-16
+#include"apue.h"
+#include<sys/wait.h>
+
+char *env_init[]={"USER=unknown","PATH=/temp",NULL};//创建一个字符数组，
+/*上面这段代码是一个字符指针数组，该数组被设计为一个环境变量数组，用于传递main函数中的参数；
+这个数组中的每个元素都是一个指向以null结尾的字符串的的指针；
+*/
+int main(void){
+    pid_t pid; //用于记录进程ID；
+    if((pid=fork())<0){
+        err_sys("fork error");
+    }else if(pid==0){ //对子进程的操作：
+        //execle函数第一个参数为要执行可执行文件的pathname，后面都是字符指针；函数出错返回-1；
+        if(execle("/home/sar/bin/echoall","echoall","myarg1","MY ARG2",(char*)0,env_init)<0)
+            err_sys("execle error");
+    }
+    //等待特定子进程，即等待pid进程，NULL表示不获取子进程的返回状态，0表示等待任何子进程退出；
+    if(waitpid(pid,NULL,0)<0)
+        err_sys("wait error");
+    if((pid=fork())<0){
+        err_sys("fork error");
+    }else if(pid==0){
+        //execlp直接第一个为filename，后面为指向字符串的字符指针；
+        if(execlp("echoall","echoall","only 1 arg",(char *)0)<0)
+            err_sys("execlp error");
+    }
+    exit(0);
+}
+
+//8-17
+#include"apue.h"
+int main(int argc, char *argv[]){
+    int i;
+    char **ptr;
+    extern char **environ;
+    for(i=0;i<argc;i++){
+        printf("argv[%d]:%s\n",i,argv[i]);
+    }
+    for(ptr=environ;*ptr!=0;ptr++){
+        printf("%s\n",*ptr);
+    }
+    exit(0);
+}
+
+//8-20
+#include"apue.h"
+#include<sys/wait.h>
+
+int main(void){
+    pid_t pid;
+
+    if((pid=fork())<0){
+        printf("fork error");
+    }else if(pid==0){
+        if(execl("/home/kyle/Files/chapter8/testinterp","testinterp","myarg1","MY ARG2",(char *)0)<0)
+            err_sys("execl error");
+    }
+    if(waitpid(pid,NULL,0)<0){
+        err_sys("waitpid error");
+    }
+    exit(0);
+}
+
+//7-4 将所有命令行参数都回显到标准输出上。
+#include"apue.h"
+int main(int argc, char *argv[]){
+    int i;
+
+    for(i=0;i<argc;i++){
+        printf("argv[%d]:%s\n",i,argv[i]);
+    }
+    exit(0);
+}
+
+
+
